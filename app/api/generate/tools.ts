@@ -1,4 +1,5 @@
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
+import { SchemaType, FunctionDeclaration } from "@google/generative-ai";
 import ytdl from "@distube/ytdl-core";
 import fs from "fs";
 import path from "path";
@@ -7,14 +8,14 @@ import os from "os";
 const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY || "");
 
 // Tool Definition
-export const downloadVideoTool = {
+export const downloadVideoTool: FunctionDeclaration = {
     name: "downloadVideo",
     description: "Downloads a YouTube video from a given URL and uploads it to Google AI File API for analysis. Returns the file URI and MIME type.",
     parameters: {
-        type: "OBJECT",
+        type: SchemaType.OBJECT,
         properties: {
             url: {
-                type: "STRING",
+                type: SchemaType.STRING,
                 description: "The full YouTube video URL to download.",
             },
         },

@@ -2,29 +2,39 @@
 
 import { useState } from 'react';
 import { VideoData } from './types';
+import InfographicGenerator from './InfographicGenerator';
 
 export default function Home() {
-  const [playlistId, setPlaylistId] = useState('');
+  const [url, setUrl] = useState('');
   const [videos, setVideos] = useState<VideoData[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
   const [infographics, setInfographics] = useState<Record<string, string>>({});
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
   const [searchQuery, setSearchQuery] = useState('');
+  const [singleVideoUrl, setSingleVideoUrl] = useState<string | null>(null);
 
-  const fetchVideos = async () => {
-    if (!playlistId) return;
+  const handleUrlSubmit = async () => {
+    if (!url) return;
+
+    const playlistIdMatch = url.match(/[?&]list=([^&]+)/);
+    const videoIdMatch = url.match(/[?&]v=([^&]+)/);
+
+    if (videoIdMatch) {
+        setSingleVideoUrl(url);
+        setVideos([]);
+    } else if (playlistIdMatch) {
+        setSingleVideoUrl(null);
+        fetchPlaylistVideos(playlistIdMatch[1]);
+    } else {
+        alert('Invalid YouTube URL. Please provide a valid video or playlist URL.');
+    }
+  };
+
+  const fetchPlaylistVideos = async (playlistId: string) => {
     setLoading(true);
     try {
-      // Extract ID if URL is provided
-      let id = playlistId;
-      const urlMatch = playlistId.match(/[?&]list=([^&]+)/);
-      if (urlMatch) {
-        id = urlMatch[1];
-      }
-
-      const res = await fetch(`/api/playlist?playlistId=${id}`);
+      const res = await fetch(`/api/playlist?playlistId=${playlistId}`);
       const data = await res.json();
       if (Array.isArray(data)) {
         setVideos(data);
@@ -84,19 +94,21 @@ export default function Home() {
         <div className="flex gap-4 mb-12 max-w-2xl mx-auto">
           <input
             type="text"
-            value={playlistId}
-            onChange={(e) => setPlaylistId(e.target.value)}
-            placeholder="Enter YouTube Playlist ID or URL"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Enter YouTube Video or Playlist URL"
             className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-yellow-500"
           />
           <button
-            onClick={fetchVideos}
+            onClick={handleUrlSubmit}
             disabled={loading}
             className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-6 py-3 rounded-lg transition-colors disabled:opacity-50"
           >
-            {loading ? 'Loading...' : 'Fetch Videos'}
+            {loading ? 'Loading...' : 'Generate'}
           </button>
         </div>
+
+        {singleVideoUrl && <InfographicGenerator videoUrl={singleVideoUrl} />}
 
         {videos.length > 0 && (
           <div className="mb-8 max-w-md mx-auto">

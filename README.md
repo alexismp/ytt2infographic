@@ -18,8 +18,6 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
@@ -27,10 +25,81 @@ To learn more about Next.js, take a look at the following resources:
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy to Google Cloud Run
 
-## Deploy on Vercel
+To deploy this application to Google Cloud Run, follow these steps:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1.  **Install Google Cloud SDK:** If you haven't already, install the Google Cloud SDK:
+    `curl https://sdk.cloud.google.com | bash`
+    Then initialize it:
+    `gcloud init`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2.  **Authenticate Docker:**
+    `gcloud auth configure-docker`
+
+3.  **Build the Docker Image:**
+    First, create a `Dockerfile` in the root of your project:
+
+    ```dockerfile
+    # Install dependencies
+    FROM node:18-alpine AS deps
+    WORKDIR /app
+    COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
+    RUN \
+        if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
+        elif [ -f package.json ]; then npm install --frozen-lockfile; \
+        elif [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; \
+        else npm install; \
+        fi
+
+    # Rebuild the source code only when needed
+    FROM node:18-alpine AS builder
+    WORKDIR /app
+    COPY --from=deps /app/node_modules ./
+    COPY . .
+    RUN npx prisma generate --schema=./prisma/schema.prisma || true
+    ENV NEXT_TELEMETRY_DISABLED 1
+    RUN npm run build
+
+    # Production image, copy all the files and run next
+    FROM node:18-alpine AS runner
+    WORKDIR /app
+
+    ENV NODE_ENV production
+    # Uncomment the following line in case you want to disable telemetry during runtime.
+    ENV NEXT_TELEMETRY_DISABLED 1
+
+    RUN addgroup --system --gid 1001 nodejs
+    RUN adduser --system --uid 1001 nextjs
+
+    COPY --from=builder /app/public ./
+    COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+    COPY --from=builder /app/node_modules ./
+    COPY --from=builder /app/package.json ./
+
+    USER nextjs
+
+    EXPOSE 3000
+
+    ENV PORT 3000
+
+    CMD ["npm", "start"]
+    ```
+
+    Then, build your Docker image. Replace `your-project-id` and `your-service-name` with your Google Cloud Project ID and desired service name:
+    `docker build -t gcr.io/your-project-id/your-service-name:latest .`
+
+4.  **Push the Docker Image:**
+    `docker push gcr.io/your-project-id/your-service-name:latest`
+
+5.  **Deploy to Cloud Run:**
+    `gcloud run deploy your-service-name --image gcr.io/your-project-id/your-service-name:latest --platform managed --region us-central1 --allow-unauthenticated`
+    (Adjust `--region` and other parameters as needed.)
+
+Remember to set your environment variables (like `GEMINI_API_KEY`) in the Cloud Run service settings after deployment.
+
+## Environment Variables
+
+This project uses the following environment variables:
+
+- `GEMINI_API_KEY`: Your Google Gemini API key.

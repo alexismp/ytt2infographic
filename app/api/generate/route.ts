@@ -3,12 +3,31 @@ import { NextResponse } from 'next/server';
 import { InfographicRequest } from '../../types';
 import { downloadVideoTool, downloadAndUploadVideo } from './tools';
 
+const rateLimitStore: Record<string, { count: number, expiry: number }> = {};
+const RATE_LIMIT_COUNT = 2;
+const RATE_LIMIT_WINDOW = 24 * 60 * 60 * 1000; // 24 hours
+
 export const maxDuration = 300; // 5 minutes timeout for video processing
 
 export async function POST(request: Request) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         return NextResponse.json({ error: 'GEMINI_API_KEY is not set' }, { status: 500 });
+    }
+
+    const ip = request.headers.get('x-forwarded-for') ?? '127.0.0.1';
+    const now = Date.now();
+
+    if (rateLimitStore[ip] && now < rateLimitStore[ip].expiry) {
+        if (rateLimitStore[ip].count >= RATE_LIMIT_COUNT) {
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+        }
+        rateLimitStore[ip].count++;
+    } else {
+        rateLimitStore[ip] = {
+            count: 1,
+            expiry: now + RATE_LIMIT_WINDOW,
+        };
     }
 
     try {
