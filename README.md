@@ -38,55 +38,7 @@ To deploy this application to Google Cloud Run, follow these steps:
     `gcloud auth configure-docker`
 
 3.  **Build the Docker Image:**
-    First, create a `Dockerfile` in the root of your project:
-
-    ```dockerfile
-    # Install dependencies
-    FROM node:18-alpine AS deps
-    WORKDIR /app
-    COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
-    RUN \
-        if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
-        elif [ -f package.json ]; then npm install --frozen-lockfile; \
-        elif [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; \
-        else npm install; \
-        fi
-
-    # Rebuild the source code only when needed
-    FROM node:18-alpine AS builder
-    WORKDIR /app
-    COPY --from=deps /app/node_modules ./
-    COPY . .
-    RUN npx prisma generate --schema=./prisma/schema.prisma || true
-    ENV NEXT_TELEMETRY_DISABLED 1
-    RUN npm run build
-
-    # Production image, copy all the files and run next
-    FROM node:18-alpine AS runner
-    WORKDIR /app
-
-    ENV NODE_ENV production
-    # Uncomment the following line in case you want to disable telemetry during runtime.
-    ENV NEXT_TELEMETRY_DISABLED 1
-
-    RUN addgroup --system --gid 1001 nodejs
-    RUN adduser --system --uid 1001 nextjs
-
-    COPY --from=builder /app/public ./
-    COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-    COPY --from=builder /app/node_modules ./
-    COPY --from=builder /app/package.json ./
-
-    USER nextjs
-
-    EXPOSE 3000
-
-    ENV PORT 3000
-
-    CMD ["npm", "start"]
-    ```
-
-    Then, build your Docker image. Replace `your-project-id` and `your-service-name` with your Google Cloud Project ID and desired service name:
+    The project already includes a `Dockerfile`. Build your Docker image. Replace `your-project-id` and `your-service-name` with your Google Cloud Project ID and desired service name:
     `docker build -t gcr.io/your-project-id/your-service-name:latest .`
 
 4.  **Push the Docker Image:**
